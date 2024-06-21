@@ -19,6 +19,7 @@ use Tinderbox\ClickhouseBuilder\Query\Enums\Operator;
 use Tinderbox\ClickhouseBuilder\Query\From;
 use Tinderbox\ClickhouseBuilder\Query\JoinClause;
 use Tinderbox\ClickhouseBuilder\Query\TwoElementsLogicExpression;
+use function Tinderbox\ClickhouseBuilder\raw;
 
 class BuilderTest extends TestCase
 {

@@ -2,16 +2,17 @@
 
 namespace Tinderbox\ClickhouseBuilder\Query;
 
-use Tinderbox\Clickhouse\Client;
-use Tinderbox\Clickhouse\Common\Format;
-use Tinderbox\Clickhouse\Query;
+use ClickHouseDB\Query\WhereInFile;
+use ClickHouseDB\Statement;
+use ClickHouseDB\Client;
+use Tinderbox\ClickhouseBuilder\Exceptions\GrammarException;
 
 class Builder extends BaseBuilder
 {
     /**
      * Client which is used to perform queries.
      *
-     * @var \Tinderbox\Clickhouse\Client
+     * @var \ClickHouseDB\Client
      */
     protected $client;
 
@@ -27,7 +28,7 @@ class Builder extends BaseBuilder
     }
 
     /**
-     * @return \Tinderbox\Clickhouse\Client
+     * @return \ClickHouseDB\Client
      */
     public function getClient(): Client
     {
@@ -37,48 +38,62 @@ class Builder extends BaseBuilder
     /**
      * Perform compiled from builder sql query and getting result.
      *
-     * @param array $settings
+//     * @param array $settings
      *
-     * @return \Tinderbox\Clickhouse\Query\Result|\Tinderbox\Clickhouse\Query\Result[]
+     * @return Statement
      */
-    public function get(array $settings = [])
+    public function get()
     {
         if (!empty($this->async)) {
-            return $this->client->read($this->toAsyncQueries());
+            return $this->client->selectAsync($this->toSql(),$this->bindings, $this->getWhereInFile(),$this->getToFile());
         } else {
-            return $this->client->readOne($this->toSql(), $this->getFiles(), $settings);
+            return $this->client->select($this->toSql(),$this->bindings, $this->getWhereInFile(),$this->getToFile());
         }
     }
 
-    /**
-     * Returns Query instance.
-     *
-     * @param array $settings
-     *
-     * @return Query
-     */
-    public function toQuery(array $settings = []): Query
+    protected function getWhereInFile()
     {
-        return new Query($this->client->getServer(), $this->toSql(), $this->getFiles(), $settings);
+        $whereInFile = null;
+        if($files = $this->getFiles()){
+            $whereInFile = new WhereInFile();
+            foreach ($files as $file_name=>$value) {
+                $whereInFile->attachFile($file_name, $value['table_name'], $value['structure'], $value['format']);
+            }
+        }
+        return $whereInFile;
     }
+
+//    /**
+//     * Returns Query instance.
+//     *
+//     * @param array $settings
+//     *
+//     * @return Query
+//     */
+//    public function toQuery(array $settings = []): Query
+//    {
+//        return new Query($this->client->getServer(), $this->toSql(), $this->getFiles(), $settings);
+//    }
 
     /**
      * Performs compiled sql for count rows only. May be used for pagination
      * Works only without async queries.
      *
-     * @return int|mixed
+     * @return int
      */
     public function count()
     {
         if (!empty($this->groups)) {
             $subThis = clone $this;
+            $subThis->orders = [];
             return $this->newQuery()->from($subThis)->count();
-        } else {
-            $builder = $this->getCountQuery();
-            $result = $builder->get();
-            return $result[0]['count'] ?? 0;
         }
+        $builder = $this->getCountQuery();
+        $result  = $builder->get();
+
+        return intval($result[0]['count'] ?? 0);
     }
+
 
     /**
      * Makes clean instance of builder.
@@ -91,52 +106,13 @@ class Builder extends BaseBuilder
     }
 
     /**
-     * Insert in table data from files.
-     *
-     * @param array  $columns
-     * @param array  $files
-     * @param string $format
-     * @param int    $concurrency
-     * @param array  $settings
-     *
-     * @return array
-     */
-    public function insertFiles(array $columns, array $files, string $format = Format::CSV, int $concurrency = 5, array $settings = []): array
-    {
-        foreach ($files as $i => $file) {
-            $files[$i] = $this->prepareFile($file);
-        }
-
-        return $this->client->writeFiles($this->getFrom()->getTable(), $columns, $files, $format, $settings, $concurrency);
-    }
-
-    /**
-     * Insert in table data from files.
-     *
-     * @param array                                                 $columns
-     * @param string|\Tinderbox\Clickhouse\Interfaces\FileInterface $file
-     * @param string                                                $format
-     * @param array                                                 $settings
-     *
-     * @return bool
-     */
-    public function insertFile(array $columns, $file, string $format = Format::CSV, array $settings = []): bool
-    {
-        $file = $this->prepareFile($file);
-
-        $result = $this->client->writeFiles($this->getFrom()->getTable(), $columns, [$file], $format, $settings);
-
-        return $result[0][0];
-    }
-
-    /**
      * Performs insert query.
      *
      * @param array $values
      *
-     * @throws \Tinderbox\ClickhouseBuilder\Exceptions\GrammarException
+     * @throws GrammarException
      *
-     * @return bool
+     * @return Statement|false
      */
     public function insert(array $values)
     {
@@ -158,19 +134,19 @@ class Builder extends BaseBuilder
             }
         }
 
-        return $this->client->writeOne($this->grammar->compileInsert($this, $values));
+        return $this->client->write($this->grammar->compileInsert($this, $values));
     }
 
     /**
      * Performs ALTER TABLE `table` DELETE query.
      *
-     * @throws \Tinderbox\ClickhouseBuilder\Exceptions\GrammarException
+     * @throws GrammarException
      *
-     * @return bool
+     * @return Statement
      */
     public function delete()
     {
-        return $this->client->writeOne(
+        return $this->client->write(
             $this->grammar->compileDelete($this)
         );
     }
@@ -182,11 +158,11 @@ class Builder extends BaseBuilder
      * @param string $engine
      * @param array  $structure
      *
-     * @return bool
+     * @return Statement
      */
     public function createTable($tableName, string $engine, array $structure, ?string $extraOptions = null)
     {
-        return $this->client->writeOne($this->grammar->compileCreateTable($tableName, $engine, $structure, false, $this->getOnCluster(), $extraOptions));
+        return $this->client->write($this->grammar->compileCreateTable($tableName, $engine, $structure, false, $this->getOnCluster(), $extraOptions));
     }
 
     /**
@@ -196,20 +172,25 @@ class Builder extends BaseBuilder
      * @param string $engine
      * @param array  $structure
      *
-     * @return bool
+     * @return Statement
      */
     public function createTableIfNotExists($tableName, string $engine, array $structure, ?string $extraOptions = null)
     {
-        return $this->client->writeOne($this->grammar->compileCreateTable($tableName, $engine, $structure, true, $this->getOnCluster(), $extraOptions));
+        return $this->client->write($this->grammar->compileCreateTable($tableName, $engine, $structure, true, $this->getOnCluster(), $extraOptions));
     }
 
     public function dropTable($tableName)
     {
-        return $this->client->writeOne($this->grammar->compileDropTable($tableName));
+        return $this->client->write($this->grammar->compileDropTable($tableName));
     }
 
     public function dropTableIfExists($tableName)
     {
-        return $this->client->writeOne($this->grammar->compileDropTable($tableName, true));
+        return $this->client->write($this->grammar->compileDropTable($tableName, true));
+    }
+
+    public function insertBatchFiles($fileNames, array $columns = [], string $format = 'CSV')
+    {
+        return $this->client->insertBatchFiles($this->getFrom()->getTable(),$fileNames,$columns,$format);
     }
 }

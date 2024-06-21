@@ -4,6 +4,8 @@ namespace Tinderbox\ClickhouseBuilder\Query;
 
 use Tinderbox\ClickhouseBuilder\Query\Enums\Operator;
 
+use function Tinderbox\ClickhouseBuilder\tp;
+
 class TwoElementsLogicExpression
 {
     /**

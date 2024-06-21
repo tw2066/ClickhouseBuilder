@@ -1,16 +1,6 @@
 {
   "name": "the-tinderbox/clickhouse-builder",
   "description": "Clickhouse sql query builder",
-  "authors": [
-    {
-      "name": "FacedSID",
-      "email": "ay@imagespark.ru"
-    },
-    {
-      "name": "Evsign",
-      "email": "evsign.alex@gmail.com"
-    }
-  ],
   "autoload": {
     "psr-4": {
       "Tinderbox\\ClickhouseBuilder\\": "src"
@@ -28,24 +18,13 @@
     ]
   },
   "require": {
-    "php": "^7.1|^8.0",
+    "php": "^8.0",
     "myclabs/php-enum": "^1.5",
-    "the-tinderbox/clickhouse-php-client": "^3.0"
+    "smi2/phpclickhouse": "^1.5"
   },
   "require-dev": {
-    "illuminate/database": "5.*",
     "phpunit/phpunit": "^6.1|^9.5",
-    "mockery/mockery": "^0.9.9|^1.4",
-    "illuminate/events": "5.*",
-    "illuminate/config": "5.*",
-    "illuminate/pagination": "5.*"
-  },
-  "extra": {
-    "laravel": {
-      "providers": [
-        "Tinderbox\\ClickhouseBuilder\\Integrations\\Laravel\\ClickhouseServiceProvider"
-      ]
-    }
+    "mockery/mockery": "^0.9.9|^1.4"
   },
   "scripts": {
     "test": "phpunit --coverage-text --colors=never",

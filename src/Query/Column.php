@@ -2,6 +2,8 @@
 
 namespace Tinderbox\ClickhouseBuilder\Query;
 
+use function Tinderbox\ClickhouseBuilder\tp;
+
 class Column
 {
     /**

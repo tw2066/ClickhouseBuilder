@@ -6,6 +6,8 @@ use Closure;
 use Tinderbox\ClickhouseBuilder\Query\Enums\JoinStrict;
 use Tinderbox\ClickhouseBuilder\Query\Enums\JoinType;
 use Tinderbox\ClickhouseBuilder\Query\Enums\Operator;
+use function Tinderbox\ClickhouseBuilder\tp;
+use function Tinderbox\ClickhouseBuilder\array_flatten;
 
 class JoinClause
 {

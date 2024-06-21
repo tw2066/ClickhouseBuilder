@@ -2,6 +2,7 @@
 
 namespace Tinderbox\ClickhouseBuilder\Query;
 
+use function Tinderbox\ClickhouseBuilder\array_flatten;
 /**
  * Object to represent tuple.
  */

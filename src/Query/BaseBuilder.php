@@ -2,16 +2,16 @@
 
 namespace Tinderbox\ClickhouseBuilder\Query;
 
+use ClickHouseDB\Query\WriteToFile;
 use Closure;
-use Tinderbox\Clickhouse\Common\File;
-use Tinderbox\Clickhouse\Common\FileFromString;
-use Tinderbox\Clickhouse\Common\TempTable;
-use Tinderbox\Clickhouse\Interfaces\FileInterface;
 use Tinderbox\ClickhouseBuilder\Query\Enums\Format;
 use Tinderbox\ClickhouseBuilder\Query\Enums\JoinStrict;
 use Tinderbox\ClickhouseBuilder\Query\Enums\JoinType;
 use Tinderbox\ClickhouseBuilder\Query\Enums\Operator;
 use Tinderbox\ClickhouseBuilder\Query\Enums\OrderDirection;
+
+use function Tinderbox\ClickhouseBuilder\tp;
+use function Tinderbox\ClickhouseBuilder\raw;
 
 abstract class BaseBuilder
 {
@@ -135,18 +135,19 @@ abstract class BaseBuilder
     protected $files = [];
 
     /**
+     * @var ?WriteToFile
+     */
+    protected $toFile = null;
+
+
+    protected $bindings = [];
+
+    /**
      * Cluster name.
      *
      * @var string|null
      */
     protected $onCluster = null;
-
-    /**
-     * File representing values which should be inserted in table.
-     *
-     * @var FileInterface
-     */
-    protected $values;
 
     /**
      * Set columns for select statement.
@@ -1838,22 +1839,6 @@ abstract class BaseBuilder
     }
 
     /**
-     * Get an array of the SQL queries from all added async builders.
-     *
-     * @return array
-     */
-    public function toAsyncQueries(): array
-    {
-        return array_map(
-            function ($query) {
-                /** @var self $query */
-                return $query->toQuery();
-            },
-            $this->getAsyncQueries()
-        );
-    }
-
-    /**
      * Get columns for select statement.
      *
      * @return array
@@ -2003,28 +1988,25 @@ abstract class BaseBuilder
         return $this->format;
     }
 
-    /**
-     * Add file with data to query.
-     *
-     * @param TempTable $file
-     *
-     * @return $this
-     */
-    public function addFile(TempTable $file)
+    //todo
+    public function addFile($file_name, $structure, $table_name = '', $format = 'CSV')
     {
-        $this->files[$file->getName()] = $file;
+        $table_name = $table_name ?: $this->getFrom()->getTable();
+        $this->files[$file_name] = ['table_name'=>$table_name,'structure'=>$structure,'format'=>$format];
 
         return $this;
     }
 
-    public function values($values)
+    public function attachFile($file_name, $structure, $format = 'CSV')
     {
-        $this->values = $this->prepareFile($values);
+
     }
 
-    public function getValues(): FileInterface
+    public function toFile(WriteToFile $file)
     {
-        return $this->values;
+        $this->toFile = $file;
+
+        return $this;
     }
 
     /**
@@ -2035,6 +2017,12 @@ abstract class BaseBuilder
     public function getFiles(): array
     {
         return $this->files;
+    }
+
+
+    public function getToFile(): ?WriteToFile
+    {
+        return $this->toFile;
     }
 
     /**
@@ -2053,17 +2041,35 @@ abstract class BaseBuilder
         return array_merge([$this], $result);
     }
 
-    /**
-     * Prepares file.
-     *
-     * @param $file
-     *
-     * @return File|FileFromString
-     */
-    protected function prepareFile($file): FileInterface
-    {
-        $file = file_from($file);
 
-        return $file;
+    /**
+     * Apply the callback's query changes if the given "value" is true.
+     *
+     * @param callable $callback
+     * @param callable $default
+     * @param mixed    $value
+     *
+     * @return $this|mixed
+     */
+    public function when($value, $callback, $default = null)
+    {
+        if ($value) {
+            return $callback($this, $value) ?: $this;
+        }
+        if ($default) {
+            return $default($this, $value) ?: $this;
+        }
+
+        return $this;
+    }
+
+    public function binding($key = '', $value = '', $bindings = [])
+    {
+        if($bindings){
+            $this->bindings = array_merge($this->bindings,$bindings);
+        }
+        if($key && $value){
+            $this->bindings[$key] = $value;
+        }
     }
 }

@@ -73,7 +73,7 @@ class FunctionsTest extends TestCase
         return $fileName;
     }
 
-    public function testInsertIntoMemory()
+/*    public function testInsertIntoMemory()
     {
         $server = new Server('127.0.0.1');
         $client = new Client((new ServerProvider())->addServer($server));
@@ -150,4 +150,5 @@ class FunctionsTest extends TestCase
             $this->assertInstanceOf(FileInterface::class, $file);
         }
     }
+*/
 }
