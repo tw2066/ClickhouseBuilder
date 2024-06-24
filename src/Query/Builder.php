@@ -38,14 +38,18 @@ class Builder extends BaseBuilder
     /**
      * Perform compiled from builder sql query and getting result.
      *
-//     * @param array $settings
-     *
-     * @return Statement
+     * @return Statement[]|Statement
      */
     public function get()
     {
         if (!empty($this->async)) {
-            return $this->client->selectAsync($this->toSql(),$this->bindings, $this->getWhereInFile(),$this->getToFile());
+            $result = [];
+            /** @var Builder $asyncQuery */
+            foreach ($this->getAsyncQueries() as $asyncQuery) {
+                $result[] = $this->client->selectAsync($asyncQuery->toSql(), $asyncQuery->bindings, $asyncQuery->getWhereInFile(), $asyncQuery->getToFile());
+            }
+            $this->client->executeAsync();
+            return $result;
         } else {
             return $this->client->select($this->toSql(),$this->bindings, $this->getWhereInFile(),$this->getToFile());
         }
@@ -63,18 +67,6 @@ class Builder extends BaseBuilder
         return $whereInFile;
     }
 
-//    /**
-//     * Returns Query instance.
-//     *
-//     * @param array $settings
-//     *
-//     * @return Query
-//     */
-//    public function toQuery(array $settings = []): Query
-//    {
-//        return new Query($this->client->getServer(), $this->toSql(), $this->getFiles(), $settings);
-//    }
-
     /**
      * Performs compiled sql for count rows only. May be used for pagination
      * Works only without async queries.
@@ -90,8 +82,7 @@ class Builder extends BaseBuilder
         }
         $builder = $this->getCountQuery();
         $result  = $builder->get();
-
-        return intval($result[0]['count'] ?? 0);
+        return intval($result->rows()[0]['count'] ?? 0);
     }
 
 

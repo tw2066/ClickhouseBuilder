@@ -1,6 +1,6 @@
 <?php
 
-namespace Tinderbox\ClickhouseBuilder;
+namespace TinderboxTest\ClickhouseBuilder;
 
 use PHPUnit\Framework\TestCase;
 use Tinderbox\ClickhouseBuilder\Query\Identifier;

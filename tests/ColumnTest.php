@@ -1,11 +1,11 @@
 <?php
 
-namespace Tinderbox\ClickhouseBuilder;
+namespace TinderboxTest\ClickhouseBuilder;
 
+use ClickHouseDB\Client;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
-use Tinderbox\Clickhouse\Client;
 use Tinderbox\ClickhouseBuilder\Query\Builder;
 use Tinderbox\ClickhouseBuilder\Query\Column;
 use Tinderbox\ClickhouseBuilder\Query\Expression;

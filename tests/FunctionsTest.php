@@ -1,20 +1,16 @@
 <?php
 
-namespace Tinderbox\ClickhouseBuilder;
+namespace TinderboxTest\ClickhouseBuilder;
 
 use PHPUnit\Framework\TestCase;
-use Tinderbox\Clickhouse\Client;
-use Tinderbox\Clickhouse\Common\File;
-use Tinderbox\Clickhouse\Common\FileFromString;
-use Tinderbox\Clickhouse\Common\Format;
-use Tinderbox\Clickhouse\Common\TempTable;
-use Tinderbox\Clickhouse\Interfaces\FileInterface;
-use Tinderbox\Clickhouse\Server;
-use Tinderbox\Clickhouse\ServerProvider;
+use ClickHouseDB\Client;
 use Tinderbox\ClickhouseBuilder\Exceptions\BuilderException;
 use Tinderbox\ClickhouseBuilder\Query\Builder;
 use Tinderbox\ClickhouseBuilder\Query\Expression;
 use Tinderbox\ClickhouseBuilder\Query\Identifier;
+use function Tinderbox\ClickhouseBuilder\raw;
+use function Tinderbox\ClickhouseBuilder\tp;
+use function Tinderbox\ClickhouseBuilder\array_flatten;
 
 class FunctionsTest extends TestCase
 {

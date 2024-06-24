@@ -1,5 +1,5 @@
 {
-  "name": "the-tinderbox/clickhouse-builder",
+  "name": "tangwei/clickhouse-builder",
   "description": "Clickhouse sql query builder",
   "autoload": {
     "psr-4": {
@@ -11,7 +11,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "Tinderbox\\ClickhouseBuilder\\": "tests"
+      "TinderboxTest\\ClickhouseBuilder\\": "tests"
     },
     "files": [
       "src/functions.php"

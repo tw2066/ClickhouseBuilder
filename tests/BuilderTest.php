@@ -1,18 +1,11 @@
 <?php
 
-namespace Tinderbox\ClickhouseBuilder;
+namespace TinderboxTest\ClickhouseBuilder;
 
+use ClickHouseDB\Client;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
-use Tinderbox\Clickhouse\Client;
-use Tinderbox\Clickhouse\Common\File;
-use Tinderbox\Clickhouse\Common\FileFromString;
-use Tinderbox\Clickhouse\Common\Format;
-use Tinderbox\Clickhouse\Common\TempTable;
-use Tinderbox\Clickhouse\Query;
-use Tinderbox\Clickhouse\Server;
-use Tinderbox\Clickhouse\ServerProvider;
 use Tinderbox\ClickhouseBuilder\Query\Builder;
 use Tinderbox\ClickhouseBuilder\Query\Column;
 use Tinderbox\ClickhouseBuilder\Query\Enums\Operator;
@@ -465,11 +458,6 @@ class BuilderTest extends TestCase
         $builder = $builder->newQuery()->select('column')->from('table')->preWhereIn('column', ['string', 1, 2, 3]);
         $this->assertEquals('SELECT `column` FROM `table` PREWHERE `column` IN (\'string\', 1, 2, 3)', $builder->toSql());
 
-        $builder = $builder->newQuery();
-        $builder->addFile(new TempTable('_numbers', '', ['number' => 'UInt64']))->select('column')->from('table')->preWhereIn('column', '_numbers');
-
-        $this->assertEquals('SELECT `column` FROM `table` PREWHERE `column` IN `_numbers`', $builder->toSql());
-
         $builder = $builder->newQuery()->from('table')->preWhereIn(function ($query) {
             $query->from('table2');
         }, ['string', 1, 2, 3]);
@@ -639,16 +627,6 @@ class BuilderTest extends TestCase
         $builder = $this->getBuilder()->from('table')->whereGlobalNotIn('column', [1, 2, 3])->orWhereGlobalNotIn('column2', [1, 2, 3]);
         $this->assertEquals('SELECT * FROM `table` WHERE `column` GLOBAL NOT IN (1, 2, 3) OR `column2` GLOBAL NOT IN (1, 2, 3)', $builder->toSql());
 
-        $builder = $builder->newQuery();
-        $builder->addFile(new TempTable('_numbers', '', ['number' => 'UInt64']))->select('column')->from('table')->whereIn('column', '_numbers');
-
-        $this->assertEquals('SELECT `column` FROM `table` WHERE `column` IN `_numbers`', $builder->toSql());
-
-        $builder = $builder->newQuery();
-        $builder->addFile(new TempTable('_numbers', '', ['number' => 'UInt64']))->select('column')->from('table')->whereGlobalIn('column', '_numbers');
-
-        $this->assertEquals('SELECT `column` FROM `table` WHERE `column` GLOBAL IN `_numbers`', $builder->toSql());
-
         $builder = $this->getBuilder()->from('table')->whereIn('column', []);
         $this->assertEquals('SELECT * FROM `table` WHERE 0 = 1', $builder->toSql());
 
@@ -762,11 +740,6 @@ class BuilderTest extends TestCase
         $builder = $this->getBuilder()->from('table')->groupBy('column')->havingIn('column', [1, 2, 3]);
         $this->assertEquals('SELECT * FROM `table` GROUP BY `column` HAVING `column` IN (1, 2, 3)', $builder->toSql());
 
-        $builder = $builder->newQuery();
-        $builder->addFile(new TempTable('_numbers', '', ['number' => 'UInt64']))->select('column')->from('table')->havingIn('column', '_numbers');
-
-        $this->assertEquals('SELECT `column` FROM `table` HAVING `column` IN `_numbers`', $builder->toSql());
-
         $builder = $this->getBuilder()->from('table')->groupBy('column')->havingNotIn('column', [1, 2, 3]);
         $this->assertEquals('SELECT * FROM `table` GROUP BY `column` HAVING `column` NOT IN (1, 2, 3)', $builder->toSql());
 
@@ -844,30 +817,37 @@ class BuilderTest extends TestCase
         $builder->unionAll('a');
     }
 
+    private function getClient(){
+        $config = [
+            'host' => '192.168.1.1',
+            'port' => '8123',
+            'username' => 'default',
+            'password' => '',
+        ];
+        $client = new Client($config);
+        $client->database('default');
+        return $client;
+
+    }
+
     public function test_readOne_and_read()
     {
-        $server = new Server('127.0.0.1');
-        $client = new Client((new ServerProvider())->addServer($server));
-
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64) engine = Memory'],
-        ], 1);
+        $client = $this->getClient();
+        
+        $client->write('drop table if exists default.builder_test');
+        $client->write('create table if not exists default.builder_test (number UInt64) engine = Memory');
 
         $builder = new Builder($client);
         $result = $builder
             ->table('system.tables')
             ->where('database', '=', 'default')
             ->where('name', '=', 'builder_test')->get();
+        $this->assertEquals(1, $result->count(), 'Correctly returns result of query');
 
-        $this->assertEquals(1, count($result->rows), 'Correctly returns result of query');
-
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'drop table if exists default.builder_test2'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64) engine = Memory'],
-            ['query' => 'create table if not exists default.builder_test2 (number UInt64) engine = Memory'],
-        ], 1);
+        $client->write('drop table if exists default.builder_test');
+        $client->write('drop table if exists default.builder_test2');
+        $client->write('create table if not exists default.builder_test (number UInt64) engine = Memory');
+        $client->write('create table if not exists default.builder_test2 (number UInt64) engine = Memory');
 
         $builder = new Builder($client);
 
@@ -882,11 +862,9 @@ class BuilderTest extends TestCase
                     ->where('name', '=', 'builder_test2');
             })->get();
 
-        $this->assertTrue(count($result[0]->rows) && count($result[0]->rows), 'Correctly returns result of query');
+        $this->assertTrue($result[0]->count() && $result[1]->count(), 'Correctly returns result of query');
 
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-        ], 1);
+        $client->write('drop table if exists default.builder_test');
 
         $query = $builder->newQuery()->from(raw('numbers(0,10)'));
         $query->asyncWithQuery()->table(raw('numbers(10,10)'));
@@ -894,8 +872,8 @@ class BuilderTest extends TestCase
         $result = $query->get();
 
         $this->assertEquals(2, count($result));
-        $this->assertEquals(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], array_column($result[0]->rows, 'number'));
-        $this->assertEquals(['10', '11', '12', '13', '14', '15', '16', '17', '18', '19'], array_column($result[1]->rows, 'number'));
+        $this->assertEquals(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], array_column($result[0]->rows(), 'number'));
+        $this->assertEquals(['10', '11', '12', '13', '14', '15', '16', '17', '18', '19'], array_column($result[1]->rows(), 'number'));
 
         $this->expectException(\InvalidArgumentException::class);
 
@@ -904,13 +882,10 @@ class BuilderTest extends TestCase
 
     public function test_insert()
     {
-        $server = new Server('127.0.0.1');
-        $client = new Client((new ServerProvider())->addServer($server));
+        $client = $this->getClient();
 
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64, string String) engine = Memory'],
-        ], 1);
+        $client->write('drop table if exists default.builder_test');
+        $client->write('create table if not exists default.builder_test (number UInt64, string String) engine = Memory');
 
         $builder = new Builder($client);
 
@@ -924,12 +899,10 @@ class BuilderTest extends TestCase
 
         $result = $builder->table('builder_test')->orderBy('number')->get();
 
-        $this->assertTrue($result->rows[0]['number'] == 1 && $result->rows[1]['number'] == 2, 'Correctly inserts data into table with values format and specified columns');
+        $this->assertTrue($result->rows()[0]['number'] == 1 && $result->rows()[1]['number'] == 2, 'Correctly inserts data into table with values format and specified columns');
 
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64, string String) engine = Memory'],
-        ], 1);
+        $client->write('drop table if exists default.builder_test');
+        $client->write('create table if not exists default.builder_test (number UInt64, string String) engine = Memory');
 
         $builder = new Builder($client);
 
@@ -939,12 +912,10 @@ class BuilderTest extends TestCase
 
         $result = $builder->table('builder_test')->orderBy('number')->get();
 
-        $this->assertTrue($result->rows[0]['number'] == 1 && $result->rows[1]['number'] == 2, 'Correctly inserts data into table with values format without columns');
+        $this->assertTrue($result->rows()[0]['number'] == 1 && $result->rows()[1]['number'] == 2, 'Correctly inserts data into table with values format without columns');
 
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64, string String) engine = Memory'],
-        ], 1);
+        $client->write('drop table if exists default.builder_test');
+        $client->write('create table if not exists default.builder_test (number UInt64, string String) engine = Memory');
 
         $builder = new Builder($client);
 
@@ -952,12 +923,10 @@ class BuilderTest extends TestCase
 
         $result = $builder->table('builder_test')->orderBy('number')->get();
 
-        $this->assertTrue($result->rows[0]['number'] == 1, 'Correctly inserts data into table with values format and one row');
+        $this->assertTrue($result->rows()[0]['number'] == 1, 'Correctly inserts data into table with values format and one row');
 
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64, string String) engine = Memory'],
-        ], 1);
+        $client->write('drop table if exists default.builder_test');
+        $client->write('create table if not exists default.builder_test (number UInt64, string String) engine = Memory');
 
         $builder = new Builder($client);
 
@@ -965,7 +934,7 @@ class BuilderTest extends TestCase
 
         $result = $builder->table('builder_test')->orderBy('number')->get();
 
-        $this->assertTrue($result->rows[0]['number'] == 1, 'Correctly inserts data into table with values format and one row with columns');
+        $this->assertTrue($result->rows()[0]['number'] == 1, 'Correctly inserts data into table with values format and one row with columns');
 
         $this->assertFalse($builder->table('table')->insert([]), 'Fails to insert empty dataset');
     }
@@ -976,44 +945,6 @@ class BuilderTest extends TestCase
         file_put_contents($fileName, $content);
 
         return $fileName;
-    }
-
-    public function test_insert_files()
-    {
-        $server = new Server('127.0.0.1');
-        $client = new Client((new ServerProvider())->addServer($server));
-
-        $client->write([
-            ['query' => 'drop table if exists default.builder_test'],
-            ['query' => 'create table if not exists default.builder_test (number UInt64, string String) engine = Memory'],
-        ], 1);
-
-        $realFiles = [
-            $this->putInTempFile('5'.PHP_EOL.'6'.PHP_EOL),
-            $this->putInTempFile('7'.PHP_EOL.'8'.PHP_EOL),
-            $this->putInTempFile('9'.PHP_EOL.'10'.PHP_EOL),
-        ];
-
-        $files = [
-            '1'.PHP_EOL.'2'.PHP_EOL,
-            new FileFromString('3'.PHP_EOL.'4'.PHP_EOL),
-            new File($realFiles[0]),
-            new TempTable('test', new File($realFiles[1]), ['number' => 'UInt64']),
-            $realFiles[2],
-        ];
-
-        $builder = new Builder($client);
-        $builder->table('builder_test')->insertFiles(['number'], $files, Format::TSV, 5);
-
-        $builder = new Builder($client);
-        $result = $builder->table('builder_test')->orderBy('number')->get();
-
-        $this->assertEquals(10, count($result->rows), 'Correctly inserts all types of files');
-
-        $this->expectException(\TypeError::class);
-
-        $builder = new Builder($client);
-        $builder->table('builder_test')->insertFiles(['number'], [new \Exception('test')], Format::TSV, 5);
     }
 
     public function testCompileAsyncQueries()
@@ -1043,10 +974,7 @@ class BuilderTest extends TestCase
 
     protected function createBuilder()
     {
-        $serverProvider = new ServerProvider();
-        $serverProvider->addServer(new Server('localhost', 8123, 'default'));
-        $client = new Client($serverProvider);
-
+        $client = $this->getClient();
         return new Builder($client);
     }
 
@@ -1057,8 +985,11 @@ class BuilderTest extends TestCase
         $builder->createTable('test', 'MergeTree order by number', [
             'number' => 'UInt64',
         ]);
-
-        $builder->newQuery()->table('test')->insertFile(['number'], new FileFromString('0'.PHP_EOL.'1'.PHP_EOL.'2'));
+        $builder->newQuery()->table('test')->insert([
+            ['number'=>1],
+            ['number'=>2],
+            ['number'=>3],
+        ]);
 
         $result = $builder->newQuery()->table('test')->count();
 
@@ -1096,7 +1027,7 @@ class BuilderTest extends TestCase
 
         $this->assertEquals(10, $result);
 
-        $result = $this->createBuilder()->newQuery()->table(raw('numbers(0,10)'))->groupBy(raw('number % 2'))->count();
+        $result = $this->createBuilder()->newQuery()->table(raw('numbers(0,10)'))->select(raw('count()'))->groupBy(raw('number % 2'))->count();
 
         $this->assertEquals(2, $result);
     }
@@ -1125,17 +1056,6 @@ class BuilderTest extends TestCase
         $this->assertEquals('SELECT * FROM `test` LEFT ARRAY JOIN `someArr`', $builder->toSql());
     }
 
-    public function testAddFile()
-    {
-        $builder = $this->getBuilder();
-        $builder->addFile(new TempTable('_numbers', '', ['number' => 'UInt64']));
-        $builder->addFile(new TempTable('_numbers2', '', ['number' => 'UInt64']));
-
-        $this->assertEquals(2, count($builder->getFiles()));
-        $this->assertArrayHasKey('_numbers', $builder->getFiles());
-        $this->assertArrayHasKey('_numbers2', $builder->getFiles());
-    }
-
     public function testToAsyncSqlsAndQueries()
     {
         $builder = $this->createBuilder();
@@ -1158,23 +1078,16 @@ class BuilderTest extends TestCase
         });
 
         $sqls = $builder->toAsyncSqls();
-        $queries = $builder->toAsyncQueries();
+        $queries = $builder->getAsyncQueries();
 
         $this->assertEquals(3, count($sqls));
         $this->assertEquals(3, count($queries));
 
         $sqls = array_column($sqls, 'query');
-        $queries = array_map(function (Query $query) {
-            return $query->getQuery();
-        }, $queries);
 
         $this->assertContains('SELECT * FROM `system`.`tables` WHERE `database` = \'default\' AND `name` = \'builder_test1\'', $sqls);
         $this->assertContains('SELECT * FROM `system`.`tables` WHERE `database` = \'default\' AND `name` = \'builder_test2\'', $sqls);
         $this->assertContains('SELECT * FROM `system`.`tables` WHERE `database` = \'default\' AND `name` = \'builder_test3\'', $sqls);
-
-        $this->assertContains('SELECT * FROM `system`.`tables` WHERE `database` = \'default\' AND `name` = \'builder_test1\'', $queries);
-        $this->assertContains('SELECT * FROM `system`.`tables` WHERE `database` = \'default\' AND `name` = \'builder_test2\'', $queries);
-        $this->assertContains('SELECT * FROM `system`.`tables` WHERE `database` = \'default\' AND `name` = \'builder_test3\'', $queries);
     }
 
     public function testJoinWithOnClause()
