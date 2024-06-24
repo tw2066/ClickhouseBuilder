@@ -137,6 +137,13 @@ class Builder extends BaseBuilder
         return $this->client->write($this->grammar->compileInsert($this, $values));
     }
 
+    public function update(array $values)
+    {
+        return $this->client->write(
+            $this->grammar->compileUpdate($this, $values)
+        );
+    }
+
     /**
      * Performs ALTER TABLE `table` DELETE query.
      *

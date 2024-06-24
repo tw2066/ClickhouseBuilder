@@ -241,6 +241,42 @@ class Grammar
     }
 
     /**
+     * Compile update query.
+     *
+     * @param BaseBuilder $query
+     *
+     * @throws GrammarException
+     *
+     * @return string
+     */
+    public function compileUpdate(BaseBuilder $query, $values)
+    {
+        $this->verifyFrom($query->getFrom());
+
+        $sql = "ALTER TABLE {$this->wrap($query->getFrom()->getTable())}";
+
+        if (!is_null($query->getOnCluster())) {
+            $sql .= " ON CLUSTER {$query->getOnCluster()}";
+        }
+
+        $sql .= ' UPDATE ';
+
+        $setSql = array_map(function ($key,$value) {
+                return sprintf('%s = %s',$this->wrap(new Identifier($key)),$this->wrap($value));
+        }, array_keys($values),$values);
+
+        $sql .= implode(',', $setSql);
+
+        if (!is_null($query->getWheres()) && !empty($query->getWheres())) {
+            $sql .= " {$this->compileWheresComponent($query, $query->getWheres())}";
+        } else {
+            throw GrammarException::missedWhereForUpdate();
+        }
+
+        return $sql;
+    }
+
+    /**
      * Convert value in literal.
      *
      * @param string|Expression|Identifier|array $value
@@ -286,6 +322,8 @@ class Grammar
             return $value;
         } elseif (is_null($value)) {
             return 'null';
+        } elseif (is_bool($value)) {
+            return $value ? '1' : '0';
         } else {
             return;
         }

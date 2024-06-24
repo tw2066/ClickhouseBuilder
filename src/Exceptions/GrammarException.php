@@ -50,4 +50,9 @@ class GrammarException extends Exception
     {
         return new static('Missed where section for delete statement.');
     }
+
+    public static function missedWhereForUpdate(): self
+    {
+        return new static('Missed where section for update statement.');
+    }
 }
