@@ -89,7 +89,7 @@ class JoinClause
     /**
      * Set table for join.
      *
-     * @param string|Expression $table
+     * @param string|Expression|BaseBuilder $table
      *
      * @return JoinClause
      */

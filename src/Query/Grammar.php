@@ -249,7 +249,7 @@ class Grammar
      *
      * @return string
      */
-    public function compileUpdate(BaseBuilder $query, $values)
+    public function compileUpdate(BaseBuilder $query, $values, $partition = null)
     {
         $this->verifyFrom($query->getFrom());
 
@@ -260,6 +260,10 @@ class Grammar
         }
 
         $sql .= ' UPDATE ';
+
+        if ($partition) {
+            $sql .= " PARTITION $partition";
+        }
 
         $setSql = array_map(function ($key,$value) {
                 return sprintf('%s = %s',$this->wrap(new Identifier($key)),$this->wrap($value));

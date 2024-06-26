@@ -3,6 +3,7 @@
 namespace TinderboxTest\ClickhouseBuilder;
 
 use ClickHouseDB\Client;
+use ClickHouseDB\Query\WriteToFile;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
@@ -817,12 +818,13 @@ class BuilderTest extends TestCase
         $builder->unionAll('a');
     }
 
-    private function getClient(){
+    private function getClient()
+    {
         $config = [
-            'host' => '192.168.1.1',
+            'host' => '192.168.1.72',
             'port' => '8123',
             'username' => 'default',
-            'password' => '',
+            'password' => 'jc123456',
         ];
         $client = new Client($config);
         $client->database('default');
@@ -833,7 +835,7 @@ class BuilderTest extends TestCase
     public function test_readOne_and_read()
     {
         $client = $this->getClient();
-        
+
         $client->write('drop table if exists default.builder_test');
         $client->write('create table if not exists default.builder_test (number UInt64) engine = Memory');
 
@@ -949,7 +951,7 @@ class BuilderTest extends TestCase
 
     public function testCompileAsyncQueries()
     {
-        $builder = $this->getBuilder();
+        $builder  = $this->getBuilder();
         $builder2 = null;
         $builder3 = null;
 
@@ -986,9 +988,9 @@ class BuilderTest extends TestCase
             'number' => 'UInt64',
         ]);
         $builder->newQuery()->table('test')->insert([
-            ['number'=>1],
-            ['number'=>2],
-            ['number'=>3],
+            ['number' => 1],
+            ['number' => 2],
+            ['number' => 3],
         ]);
 
         $result = $builder->newQuery()->table('test')->count();
@@ -1077,7 +1079,7 @@ class BuilderTest extends TestCase
                 ->where('name', '=', 'builder_test3');
         });
 
-        $sqls = $builder->toAsyncSqls();
+        $sqls    = $builder->toAsyncSqls();
         $queries = $builder->getAsyncQueries();
 
         $this->assertEquals(3, count($sqls));
@@ -1115,5 +1117,69 @@ class BuilderTest extends TestCase
             $join->table('table3')->on('column_from_table_3', '=', 'column_from_table_1');
         });
         $this->assertEquals('SELECT * FROM `table1` ANY LEFT JOIN `table2` ON `column_from_table_2` = `column_from_table_1` ALL LEFT JOIN `table3` ON `column_from_table_3` = `column_from_table_1`', $builder->toSql());
+    }
+
+    public function testInFile()
+    {
+        $client = $this->getClient();
+
+        $client->write('drop table if exists builder_test');
+        $client->write('create table if not exists builder_test (number Int32,name String, string String) engine = Memory');
+
+        $builder = new Builder($client);
+
+        $builder->table('builder_test')->insert([[
+            'number' => 1,
+            'name' => 'name1',
+            'string' => 'value1',
+        ], [
+            'number' => 2,
+            'name' => 'name2',
+            'string' => 'value2',
+        ], [
+            'number' => 3,
+            'name' => 'name3',
+            'string' => 'value3',
+        ]]);
+
+        $result = $builder->table('builder_test')
+            ->attachFile(__DIR__ . '/test.csv','temp_table',['id' => 'Int32','mark' => 'String'])
+//            ->anyLeftJoin(function (JoinClause $join) {
+//                $join->table('temp_table')->on('number', '=', 'id');
+//            })
+            ->whereIn('number', $builder->newQuery()->table('temp_table')->select('id'))
+            ->get();
+
+        $this->assertEquals(2, $result->count());
+    }
+    public function testToFile()
+    {
+        $client = $this->getClient();
+
+        $client->write('drop table if exists builder_test');
+        $client->write('create table if not exists builder_test (number Int32,name String, string String) engine = Memory');
+
+        $builder = new Builder($client);
+
+        $builder->table('builder_test')->insert([[
+            'number' => 1,
+            'name' => 'name1',
+            'string' => 'value1',
+        ], [
+            'number' => 2,
+            'name' => 'name2',
+            'string' => 'value2',
+        ], [
+            'number' => 3,
+            'name' => 'name3',
+            'string' => 'value3',
+        ]]);
+
+        $filename = __DIR__ .'/_1_select.csv';
+        $WriteToFile = new WriteToFile($filename);
+        $builder->table('builder_test')->toFile($WriteToFile)->get();
+        $contents = file_get_contents($filename);
+        $firstStr = explode(PHP_EOL,$contents)[0];
+        $this->assertEquals('1,"name1","value1"',$firstStr);
     }
 }

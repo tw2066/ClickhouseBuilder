@@ -12,27 +12,30 @@ class Builder extends BaseBuilder
     /**
      * Client which is used to perform queries.
      *
-     * @var \ClickHouseDB\Client
+     * @var ?Client
      */
-    protected $client;
+    protected $client = null;
 
     /**
      * Builder constructor.
-     *
-     * @param Client $client
      */
-    public function __construct(Client $client)
+    public function __construct(?Client $client = null)
     {
         $this->client = $client;
         $this->grammar = new Grammar();
     }
 
     /**
-     * @return \ClickHouseDB\Client
+     * @return Client
      */
-    public function getClient(): Client
+    protected function getClient(): Client
     {
         return $this->client;
+    }
+
+    public function setClient(Client $client): void
+    {
+        $this->client = $client;
     }
 
     /**
@@ -46,12 +49,12 @@ class Builder extends BaseBuilder
             $result = [];
             /** @var Builder $asyncQuery */
             foreach ($this->getAsyncQueries() as $asyncQuery) {
-                $result[] = $this->client->selectAsync($asyncQuery->toSql(), $asyncQuery->bindings, $asyncQuery->getWhereInFile(), $asyncQuery->getToFile());
+                $result[] = $this->getClient()->selectAsync($asyncQuery->toSql(), $asyncQuery->bindings, $asyncQuery->getWhereInFile(), $asyncQuery->getToFile());
             }
-            $this->client->executeAsync();
+            $this->getClient()->executeAsync();
             return $result;
         } else {
-            return $this->client->select($this->toSql(),$this->bindings, $this->getWhereInFile(),$this->getToFile());
+            return $this->getClient()->select($this->toSql(),$this->bindings, $this->getWhereInFile(),$this->getToFile());
         }
     }
 
@@ -93,7 +96,7 @@ class Builder extends BaseBuilder
      */
     public function newQuery(): self
     {
-        return new static($this->client);
+        return new static();
     }
 
     /**
@@ -125,12 +128,12 @@ class Builder extends BaseBuilder
             }
         }
 
-        return $this->client->write($this->grammar->compileInsert($this, $values));
+        return $this->getClient()->write($this->grammar->compileInsert($this, $values));
     }
 
     public function update(array $values)
     {
-        return $this->client->write(
+        return $this->getClient()->write(
             $this->grammar->compileUpdate($this, $values)
         );
     }
@@ -144,7 +147,7 @@ class Builder extends BaseBuilder
      */
     public function delete()
     {
-        return $this->client->write(
+        return $this->getClient()->write(
             $this->grammar->compileDelete($this)
         );
     }
@@ -160,7 +163,7 @@ class Builder extends BaseBuilder
      */
     public function createTable($tableName, string $engine, array $structure, ?string $extraOptions = null)
     {
-        return $this->client->write($this->grammar->compileCreateTable($tableName, $engine, $structure, false, $this->getOnCluster(), $extraOptions));
+        return $this->getClient()->write($this->grammar->compileCreateTable($tableName, $engine, $structure, false, $this->getOnCluster(), $extraOptions));
     }
 
     /**
@@ -174,21 +177,21 @@ class Builder extends BaseBuilder
      */
     public function createTableIfNotExists($tableName, string $engine, array $structure, ?string $extraOptions = null)
     {
-        return $this->client->write($this->grammar->compileCreateTable($tableName, $engine, $structure, true, $this->getOnCluster(), $extraOptions));
+        return $this->getClient()->write($this->grammar->compileCreateTable($tableName, $engine, $structure, true, $this->getOnCluster(), $extraOptions));
     }
 
     public function dropTable($tableName)
     {
-        return $this->client->write($this->grammar->compileDropTable($tableName));
+        return $this->getClient()->write($this->grammar->compileDropTable($tableName));
     }
 
     public function dropTableIfExists($tableName)
     {
-        return $this->client->write($this->grammar->compileDropTable($tableName, true));
+        return $this->getClient()->write($this->grammar->compileDropTable($tableName, true));
     }
 
     public function insertBatchFiles($fileNames, array $columns = [], string $format = 'CSV')
     {
-        return $this->client->insertBatchFiles($this->getFrom()->getTable(),$fileNames,$columns,$format);
+        return $this->getClient()->insertBatchFiles($this->getFrom()->getTable()->__toString(),$fileNames,$columns,$format);
     }
 }

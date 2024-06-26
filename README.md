@@ -3,25 +3,29 @@
 
 # Requirements
 
-`php 7.1+`
+`php 8.0+`
 
 # Install
 
 Via composer
 
 ```bash
-composer require the-tinderbox/clickhouse-builder
+composer require tangwei/clickhouse-builder
 ```
 
 # Usage
-For working query builder we must previously instantiate and pass in constructor `the-tinderbox/clickhouse-php-client`.
+For working query builder we must previously instantiate and pass in constructor `smi2/phpclickhouse`.
 
 ```php
-$server = new Tinderbox\Clickhouse\Server('127.0.0.1', '8123', 'default', 'user', 'pass');
-$serverProvider = (new Tinderbox\Clickhouse\ServerProvider())->addServer($server);
-
-$client = new Tinderbox\Clickhouse\Client($serverProvider);
-$builder = new Builder($client);
+$config = [
+    'host' => '127.0.0.1',
+    'port' => '8123',
+    'username' => 'user',
+    'password' => 'pass',
+];
+$client = new \ClickHouseDB\Client($config);
+$client->database('default');
+$builder = new \Tinderbox\ClickhouseBuilder\Query\Builder($client);
 ```
 After that we can build and perform sql queries.
 
@@ -198,16 +202,14 @@ SELECT * FROM `test` LEFT ARRAY JOIN `someArr`
 There are some cases when you need to filter f.e. users by their ids, but amount of ids is huge. You can
 store users ids in local file, upload it to server and use it as temporary table.
 
-Read more about local files [here](https://github.com/the-tinderbox/ClickhouseClient) in section `Using local files`.
+Read more about local files [here](https://github.com/smi2/phpClickHouse) in section `Select WHERE IN ( local csv file )`.
 
 #### Select
 
-You should pass instance of `TempTable` with declared table structure to attach file to query.
 
 ```php
-$builder->addFile(new TempTable('numbersTable', 'numbers.tsv', ['number' => 'UInt64'], Format::TSV));
-
-$builder->table(raw('numbers(0,1000)')->whereIn('number', 'numbersTable')->get();
+$file_name_data1 = '/tmp/temp_csv.txt'; 
+$builder->table(raw('numbers(0,1000)')->attachFile($file_name_data1,'temp_tale', ['site_id' => 'Int32', 'site_hash' => 'String'], \ClickHouseDB\Query\WhereInFile::FORMAT_CSV)->get();
 ```
 
 **If you want tables to be detected automatically, call `addFile` method before calling `whereIn`.**
@@ -216,42 +218,11 @@ You can use local files in `whereIn`, `prewhereIn`, `havingIn` and `join` statem
 
 #### Insert
 
-If you want to insert file or files into Clickhouse, you could use `insertFile` and `insertFiles` methods.
+If you want to insert file or files into Clickhouse, you could use `insertBatchFiles` methods.
 
 ```
-$builder->table('test')->insertFile(['date', 'userId'], 'test.tsv', Format::TSV);
+$builder->table('test')->insertBatchFiles('test.tsv',['event_time', 'site_key'], Format::TSV);
 ```
-
-Or you can pass batch of files into `insertFiles` method and all of them will be inserted
-asynchronously.
-
-```
-$builder->table('test')-insertFiles(['date', 'userId'], [
-    'test-1.tsv',
-    'test-2.tsv',
-    'test-3.tsv',
-    'test-4.tsv',
-    'test-5.tsv',
-    'test-6.tsv',
-    'test-7.tsv',
-], Format::TSV)
-```
-
-Also, you can use helper and insert data to temporary table with engine Memory.
-
-```
-$builder->table('test')->values('test.tsv')->format(Format::TSV);
-
-into_memory_table($builder, [
-    'date' => 'Date',
-    'userId' => 'UInt64'
-]);
-```
-
-Helper will drop temporary table with name `test` and creates table with declared structure, engine Memory
-and inserts data from `test.tsv` file into just created table.
-
-It's helpful if you want to fill some table with data to execute query and then drop it.
 
 ### Prewhere, where, having
 All example will be about where, but same behavior also is for prewhere and having.

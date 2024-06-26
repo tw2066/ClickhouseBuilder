@@ -1988,18 +1988,10 @@ abstract class BaseBuilder
         return $this->format;
     }
 
-    //todo
-    public function addFile($file_name, $structure, $table_name = '', $format = 'CSV')
+    public function attachFile($file_name, $table_name , $structure, $format = 'CSV')
     {
-        $table_name = $table_name ?: $this->getFrom()->getTable();
         $this->files[$file_name] = ['table_name'=>$table_name,'structure'=>$structure,'format'=>$format];
-
         return $this;
-    }
-
-    public function attachFile($file_name, $structure, $format = 'CSV')
-    {
-
     }
 
     public function toFile(WriteToFile $file)
