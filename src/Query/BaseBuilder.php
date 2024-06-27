@@ -2,6 +2,7 @@
 
 namespace Tinderbox\ClickhouseBuilder\Query;
 
+use ClickHouseDB\Client;
 use ClickHouseDB\Query\WriteToFile;
 use Closure;
 use Tinderbox\ClickhouseBuilder\Query\Enums\Format;
@@ -148,6 +149,32 @@ abstract class BaseBuilder
      * @var string|null
      */
     protected $onCluster = null;
+
+    /**
+     * Client which is used to perform queries.
+     *
+     * @var ?Client
+     */
+    protected $client = null;
+
+    /**
+     * Builder constructor.
+     */
+    public function __construct(?Client $client = null)
+    {
+        $this->client = $client;
+        $this->grammar = new Grammar();
+    }
+
+    /**
+     * Makes clean instance of builder.
+     *
+     * @return self
+     */
+    public function newQuery(): self
+    {
+        return new static($this->client);
+    }
 
     /**
      * Set columns for select statement.

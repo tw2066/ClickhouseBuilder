@@ -9,21 +9,6 @@ use Tinderbox\ClickhouseBuilder\Exceptions\GrammarException;
 
 class Builder extends BaseBuilder
 {
-    /**
-     * Client which is used to perform queries.
-     *
-     * @var ?Client
-     */
-    protected $client = null;
-
-    /**
-     * Builder constructor.
-     */
-    public function __construct(?Client $client = null)
-    {
-        $this->client = $client;
-        $this->grammar = new Grammar();
-    }
 
     /**
      * @return Client
@@ -88,16 +73,6 @@ class Builder extends BaseBuilder
         return intval($result->rows()[0]['count'] ?? 0);
     }
 
-
-    /**
-     * Makes clean instance of builder.
-     *
-     * @return self
-     */
-    public function newQuery(): self
-    {
-        return new static();
-    }
 
     /**
      * Performs insert query.

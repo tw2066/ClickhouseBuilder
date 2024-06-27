@@ -1,0 +1,29 @@
+name: PHPUnit
+
+on: [ push, pull_request ]
+
+jobs:
+  ci:
+    name: Test PHP ${{ matrix.php-version }} on ${{ matrix.engine }}
+    runs-on: "${{ matrix.os }}"
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        php-version: [ '8.0','8.1','8.2','8.3' ]
+      max-parallel: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: phpize
+          ini-values: opcache.enable_cli=1
+          coverage: none
+      - name: Setup Packages
+        run: composer update -o
+      - name: Run Test Cases
+        run: |
+          composer analyse
+          composer test

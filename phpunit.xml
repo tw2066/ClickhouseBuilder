@@ -12,6 +12,9 @@
     <testsuites>
         <testsuite name="Tinderbox Clickhouse Test Suite">
             <directory>tests</directory>
+            <exclude>
+                tests/BuilderTest.php
+            </exclude>
         </testsuite>
     </testsuites>
     <coverage>

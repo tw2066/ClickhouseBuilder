@@ -824,7 +824,7 @@ class BuilderTest extends TestCase
             'host' => '192.168.1.72',
             'port' => '8123',
             'username' => 'default',
-            'password' => 'jc123456',
+            'password' => '',
         ];
         $client = new Client($config);
         $client->database('default');
