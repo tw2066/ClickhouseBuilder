@@ -106,6 +106,9 @@ class Builder extends BaseBuilder
         return $this->getClient()->write($this->grammar->compileInsert($this, $values));
     }
 
+    /**
+     * use with caution
+     */
     public function update(array $values)
     {
         return $this->getClient()->write(
@@ -120,10 +123,10 @@ class Builder extends BaseBuilder
      *
      * @return Statement
      */
-    public function delete()
+    public function delete($lightweight = true)
     {
         return $this->getClient()->write(
-            $this->grammar->compileDelete($this)
+            $this->grammar->compileDelete($this,$lightweight)
         );
     }
 

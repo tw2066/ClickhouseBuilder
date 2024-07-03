@@ -219,17 +219,18 @@ class Grammar
      *
      * @return string
      */
-    public function compileDelete(BaseBuilder $query)
+    public function compileDelete(BaseBuilder $query,$lightweight = true)
     {
         $this->verifyFrom($query->getFrom());
 
-        $sql = "ALTER TABLE {$this->wrap($query->getFrom()->getTable())}";
+        $sql = $lightweight ? 'DELETE FROM' : 'ALTER TABLE';
+
+        $sql .= " {$this->wrap($query->getFrom()->getTable())}";
 
         if (!is_null($query->getOnCluster())) {
             $sql .= " ON CLUSTER {$query->getOnCluster()}";
         }
-
-        $sql .= ' DELETE';
+        !$lightweight && $sql .= ' DELETE';
 
         if (!is_null($query->getWheres()) && !empty($query->getWheres())) {
             $sql .= " {$this->compileWheresComponent($query, $query->getWheres())}";
@@ -249,7 +250,7 @@ class Grammar
      *
      * @return string
      */
-    public function compileUpdate(BaseBuilder $query, $values, $partition = null)
+    public function compileUpdate(BaseBuilder $query,array $values, $partition = null)
     {
         $this->verifyFrom($query->getFrom());
 
@@ -262,7 +263,7 @@ class Grammar
         $sql .= ' UPDATE ';
 
         if ($partition) {
-            $sql .= " PARTITION $partition";
+            $sql .= " PARTITION $partition ";
         }
 
         $setSql = array_map(function ($key,$value) {

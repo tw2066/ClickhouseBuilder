@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace TinderboxTest\ClickhouseBuilder;
 
+use ClickHouseDB\Client;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
-use ClickHouseDB\Client;
+use stdClass;
 use Tinderbox\ClickhouseBuilder\Exceptions\GrammarException;
 use Tinderbox\ClickhouseBuilder\Query\Builder;
 use Tinderbox\ClickhouseBuilder\Query\Column;
@@ -19,6 +22,10 @@ use Tinderbox\ClickhouseBuilder\Query\JoinClause;
 use Tinderbox\ClickhouseBuilder\Query\Tuple;
 use Tinderbox\ClickhouseBuilder\Query\TwoElementsLogicExpression;
 
+/**
+ * @internal
+ * @coversNothing
+ */
 class GrammarTest extends TestCase
 {
     use MockeryPHPUnitIntegration;
@@ -53,7 +60,7 @@ class GrammarTest extends TestCase
         $value = $grammar->wrap(10);
         $this->assertEquals(10, $value);
 
-        $this->assertNull($grammar->wrap(new \stdClass()));
+        $this->assertNull($grammar->wrap(new stdClass()));
     }
 
     public function testCompileInsert()
@@ -390,14 +397,14 @@ class GrammarTest extends TestCase
         $builder = $this->getBuilder();
         $builder->from('table')->where('column', 1);
 
-        $sql = $grammar->compileDelete($builder);
+        $sql = $grammar->compileDelete($builder, false);
 
         $this->assertEquals('ALTER TABLE `table` DELETE WHERE `column` = 1', $sql);
 
         $builder = $this->getBuilder();
         $builder->from('table')->where('column', 1)->onCluster('test');
 
-        $sql = $grammar->compileDelete($builder);
+        $sql = $grammar->compileDelete($builder, false);
 
         $this->assertEquals('ALTER TABLE `table` ON CLUSTER test DELETE WHERE `column` = 1', $sql);
 
@@ -407,7 +414,25 @@ class GrammarTest extends TestCase
         $this->expectException(GrammarException::class);
         $this->expectExceptionMessage('Missed where section for delete statement.');
 
-        $grammar->compileDelete($builder);
+        $grammar->compileDelete($builder, false);
+    }
+
+    public function testCompileLightweightDelete()
+    {
+        $grammar = new Grammar();
+        $builder = $this->getBuilder();
+        $builder->from('table')->where('column', 1);
+
+        $sql = $grammar->compileDelete($builder);
+
+        $this->assertEquals('DELETE FROM `table` WHERE `column` = 1', $sql);
+
+        $builder = $this->getBuilder();
+        $builder->from('table')->where('column', 1)->onCluster('test');
+
+        $sql = $grammar->compileDelete($builder);
+
+        $this->assertEquals('DELETE FROM `table` ON CLUSTER test WHERE `column` = 1', $sql);
     }
 
     public function testCompileCreateTable()
@@ -433,5 +458,23 @@ class GrammarTest extends TestCase
 
         $sql = $grammar->compileDropTable('table', false);
         $this->assertEquals('DROP TABLE table', $sql);
+    }
+
+    public function testCompileUpdate()
+    {
+        $grammar = new Grammar();
+        $builder = $this->getBuilder();
+        $builder->from('table')->where('id', 1);
+
+        $sql = $grammar->compileUpdate($builder, ['name' => 'test']);
+
+        $this->assertEquals('ALTER TABLE `table` UPDATE `name` = \'test\' WHERE `id` = 1', $sql);
+
+        $builder = $this->getBuilder();
+        $builder->from('table')->where('id', 1)->onCluster('test');
+
+        $sql = $grammar->compileUpdate($builder, ['name' => 'test']);
+
+        $this->assertEquals('ALTER TABLE `table` ON CLUSTER test UPDATE `name` = \'test\' WHERE `id` = 1', $sql);
     }
 }
